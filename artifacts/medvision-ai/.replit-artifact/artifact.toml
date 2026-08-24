@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "MedVision AI"
+description = "A hospital-grade radiology workspace for reviewing chest X-rays and brain MRI studies with AI-generated findings, segmentation overlays, heatmaps, reports, analytics, worklists, and audit visibility."
+version = "1.0.0"
+id = "artifacts/medvision-ai"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26030
+
+[services.development]
+run = "pnpm --filter @workspace/medvision-ai run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/medvision-ai", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/medvision-ai/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26030"
+BASE_PATH = "/"

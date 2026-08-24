@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface AuditEvent {
+  id: string;
+  action: string;
+  actor: string;
+  timestamp: string;
+  detail: string;
 }

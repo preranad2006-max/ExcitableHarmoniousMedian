@@ -10,6 +10,12 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: studies
+    description: Radiology study worklist and review operations
+  - name: dashboard
+    description: Operational dashboard metrics
+  - name: audit
+    description: Review and access audit events
 paths:
   /healthz:
     get:
@@ -24,7 +30,138 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /studies:
+    get:
+      operationId: listStudies
+      tags: [studies]
+      summary: List radiology studies
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [all, unread, review, finalized]
+            default: all
+        - name: modality
+          in: query
+          schema:
+            type: string
+            enum: [all, xray, mri]
+            default: all
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Study list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Study"
+    post:
+      operationId: createStudy
+      tags: [studies]
+      summary: Create a study from an uploaded DICOM asset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyInput"
+      responses:
+        "201":
+          description: Study created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Study"
+  /studies/{studyId}:
+    get:
+      operationId: getStudy
+      tags: [studies]
+      summary: Get a radiology study with AI findings
+      parameters:
+        - $ref: "#/components/parameters/StudyId"
+      responses:
+        "200":
+          description: Study detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Study"
+        "404":
+          description: Study not found
+  /studies/{studyId}/analyze:
+    post:
+      operationId: analyzeStudy
+      tags: [studies]
+      summary: Run AI inference for a study
+      parameters:
+        - $ref: "#/components/parameters/StudyId"
+      responses:
+        "200":
+          description: Updated AI analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+  /studies/{studyId}/report:
+    patch:
+      operationId: updateStudyReport
+      tags: [studies]
+      summary: Save a radiologist report draft or finalize a report
+      parameters:
+        - $ref: "#/components/parameters/StudyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportUpdate"
+      responses:
+        "200":
+          description: Updated study
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Study"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get radiology operations summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /audit-events:
+    get:
+      operationId: listAuditEvents
+      tags: [audit]
+      summary: List recent audit events
+      responses:
+        "200":
+          description: Audit event list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEvent"
 components:
+  parameters:
+    StudyId:
+      name: studyId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +170,124 @@ components:
           type: string
       required:
         - status
+    Study:
+      type: object
+      required: [id, patientId, patientName, accessionNumber, modality, bodyPart, studyDate, status, priority, imageCount, imageUrl, findings, report]
+      properties:
+        id: { type: string }
+        patientId: { type: string }
+        patientName: { type: string }
+        accessionNumber: { type: string }
+        modality:
+          type: string
+          enum: [xray, mri]
+        bodyPart: { type: string }
+        studyDate: { type: string }
+        status:
+          type: string
+          enum: [unread, review, finalized]
+        priority:
+          type: string
+          enum: [routine, urgent, stat]
+        imageCount: { type: number }
+        imageUrl: { type: string }
+        thumbnailUrl: { type: string }
+        modelVersion: { type: ["string", "null"] }
+        inferenceTimeMs: { type: ["number", "null"] }
+        findings:
+          type: array
+          items: { $ref: "#/components/schemas/Finding" }
+        report: { $ref: "#/components/schemas/Report" }
+    StudyInput:
+      type: object
+      required: [patientId, patientName, accessionNumber, modality, bodyPart, imageUrl, imageCount]
+      properties:
+        patientId: { type: string }
+        patientName: { type: string }
+        accessionNumber: { type: string }
+        modality:
+          type: string
+          enum: [xray, mri]
+        bodyPart: { type: string }
+        imageUrl: { type: string }
+        imageCount: { type: number }
+    Finding:
+      type: object
+      required: [id, label, confidence, severity, description, heatmapRegion]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        confidence: { type: number }
+        severity:
+          type: string
+          enum: [normal, low, moderate, high]
+        description: { type: string }
+        heatmapRegion: { type: string }
+    Report:
+      type: object
+      required: [indication, findings, impression, status]
+      properties:
+        indication: { type: string }
+        findings: { type: string }
+        impression: { type: string }
+        status:
+          type: string
+          enum: [draft, finalized]
+        updatedAt: { type: string }
+    AnalysisResult:
+      type: object
+      required: [studyId, modelName, modelVersion, status, findings, completedAt]
+      properties:
+        studyId: { type: string }
+        modelName: { type: string }
+        modelVersion: { type: string }
+        status:
+          type: string
+          enum: [complete, processing]
+        findings:
+          type: array
+          items: { $ref: "#/components/schemas/Finding" }
+        completedAt: { type: string }
+    DashboardSummary:
+      type: object
+      required: [studiesToday, pendingReview, statStudies, finalizedToday, avgTurnaroundMinutes, modalityMix, activity]
+      properties:
+        studiesToday: { type: number }
+        pendingReview: { type: number }
+        statStudies: { type: number }
+        finalizedToday: { type: number }
+        avgTurnaroundMinutes: { type: number }
+        modalityMix:
+          type: array
+          items:
+            type: object
+            required: [label, value]
+            properties:
+              label: { type: string }
+              value: { type: number }
+        activity:
+          type: array
+          items:
+            type: object
+            required: [label, value]
+            properties:
+              label: { type: string }
+              value: { type: number }
+    AuditEvent:
+      type: object
+      required: [id, action, actor, timestamp, detail]
+      properties:
+        id: { type: string }
+        action: { type: string }
+        actor: { type: string }
+        timestamp: { type: string }
+        detail: { type: string }
+    ReportUpdate:
+      type: object
+      required: [indication, findings, impression, finalize]
+      properties:
+        indication: { type: string }
+        findings: { type: string }
+        impression: { type: string }
+        finalize: { type: boolean }
 

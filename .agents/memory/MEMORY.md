@@ -1,0 +1,1 @@
+- [OpenAPI/Zod compatibility](openapi-zod-compatibility.md) — prefer generated numeric schemas that match the installed Zod runtime.
